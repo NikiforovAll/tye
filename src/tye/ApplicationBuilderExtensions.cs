@@ -40,7 +40,7 @@ namespace Microsoft.Tye
 
                 foreach (var rule in ingress.Rules)
                 {
-                    rules.Add(new IngressRule(rule.Host, rule.Path, rule.Service!));
+                    rules.Add(new IngressRule(rule.Host, rule.Path, rule.Service!, rule.PreservePath));
                 }
 
                 var runInfo = new IngressRunInfo(rules);
@@ -63,13 +63,13 @@ namespace Microsoft.Tye
                 services.Add(ingress.Name, new Service(description));
             }
 
+            // If there's an ingress then the service is private
+            var privateService = ingress != null;
+
             foreach (var service in application.Services)
             {
                 RunInfo? runInfo;
                 int replicas;
-
-                // If there's an ingress then the service is private
-                var privateService = ingress != null;
 
                 var env = new List<EnvironmentVariable>();
                 if (service is ExternalServiceBuilder)
@@ -79,10 +79,7 @@ namespace Microsoft.Tye
                 }
                 else if (service is ContainerServiceBuilder container)
                 {
-                    var dockerRunInfo = new DockerRunInfo(container.Image, container.Args)
-                    {
-                        Private = privateService
-                    };
+                    var dockerRunInfo = new DockerRunInfo(container.Image, container.Args);
 
                     foreach (var mapping in container.Volumes)
                     {
