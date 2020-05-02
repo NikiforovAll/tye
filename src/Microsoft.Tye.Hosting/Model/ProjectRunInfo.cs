@@ -45,8 +45,6 @@ namespace Microsoft.Tye.Hosting.Model
 
         public string RunCommand { get; }
         public string RunArguments { get; }
-
-        // This exists for running projects as containers
         public List<DockerVolume> VolumeMappings { get; } = new List<DockerVolume>();
     }
 }

@@ -31,11 +31,46 @@ namespace Microsoft.Tye
         public static Application ToHostingApplication(this ApplicationBuilder application)
         {
             var services = new Dictionary<string, Service>();
+            var ingress = application.Ingress;
+
+            // Ingress get turned into services for hosting
+            if (ingress != null)
+            {
+                var rules = new List<IngressRule>();
+
+                foreach (var rule in ingress.Rules)
+                {
+                    rules.Add(new IngressRule(rule.Host, rule.Path, rule.Service!));
+                }
+
+                var runInfo = new IngressRunInfo(rules);
+
+                var description = new ServiceDescription(ingress.Name, runInfo)
+                {
+                    Replicas = ingress.Replicas,
+                };
+
+                foreach (var binding in ingress.Bindings)
+                {
+                    description.Bindings.Add(new ServiceBinding()
+                    {
+                        Name = binding.Name,
+                        Port = binding.Port,
+                        Protocol = binding.Protocol,
+                    });
+                }
+
+                services.Add(ingress.Name, new Service(description));
+            }
 
             foreach (var service in application.Services)
             {
                 RunInfo? runInfo;
                 int replicas;
+
+                // If there's an ingress then the service is private
+                var privateService = ingress != null;
+
                 var env = new List<EnvironmentVariable>();
                 if (service is ExternalServiceBuilder)
                 {
@@ -44,7 +79,10 @@ namespace Microsoft.Tye
                 }
                 else if (service is ContainerServiceBuilder container)
                 {
-                    var dockerRunInfo = new DockerRunInfo(container.Image, container.Args);
+                    var dockerRunInfo = new DockerRunInfo(container.Image, container.Args)
+                    {
+                        Private = privateService
+                    };
 
                     foreach (var mapping in container.Volumes)
                     {
@@ -81,7 +119,10 @@ namespace Microsoft.Tye
                         throw new InvalidOperationException($"Unable to run {project.Name}. The project does not have a run command");
                     }
 
-                    var projectInfo = new ProjectRunInfo(project);
+                    var projectInfo = new ProjectRunInfo(project)
+                    {
+                        Private = privateService
+                    };
 
                     foreach (var mapping in project.Volumes)
                     {
@@ -125,37 +166,10 @@ namespace Microsoft.Tye
                 services.Add(service.Name, new Service(description));
             }
 
-            // Ingress get turned into services for hosting
-            foreach (var ingress in application.Ingress)
+            return new Application(application.Source, services)
             {
-                var rules = new List<IngressRule>();
-
-                foreach (var rule in ingress.Rules)
-                {
-                    rules.Add(new IngressRule(rule.Host, rule.Path, rule.Service!));
-                }
-
-                var runInfo = new IngressRunInfo(rules);
-
-                var description = new ServiceDescription(ingress.Name, runInfo)
-                {
-                    Replicas = ingress.Replicas,
-                };
-
-                foreach (var binding in ingress.Bindings)
-                {
-                    description.Bindings.Add(new ServiceBinding()
-                    {
-                        Name = binding.Name,
-                        Port = binding.Port,
-                        Protocol = binding.Protocol,
-                    });
-                }
-
-                services.Add(ingress.Name, new Service(description));
-            }
-
-            return new Application(application.Source, services) { Network = application.Network };
+                Network = application.Network
+            };
         }
 
         public static Tye.Hosting.Model.EnvironmentVariable ToHostingEnvironmentVariable(this EnvironmentVariableBuilder builder)

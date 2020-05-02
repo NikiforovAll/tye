@@ -14,8 +14,6 @@ namespace Microsoft.Tye.Hosting.Model
             Args = args;
         }
 
-        public bool Private { get; set; }
-
         public string? NetworkAlias { get; set; }
 
         public string? WorkingDirectory { get; set; }
